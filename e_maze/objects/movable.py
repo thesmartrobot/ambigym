@@ -3,11 +3,34 @@ import numpy as np
 from e_maze.utils import fuzzy_equal, line_segment_line_segment_intersection, orientation, distance_point_to_line_segment
 
 class Movable():
+    """
+    Base class to specify the physics of movable objects in the world.
+    Currently, only discrete movement is possible.
+    Continuous movement is work in progress.
+    """
+
     def __init__(self, position, angle=0.0, speed=0.0, turn_rate=0.0,
                  max_speed=None, min_speed=None,
                  mass=0, force=None):
         """
-        Set force=None to always move at max_speed.
+        Construct a movable object.
+
+        Set force=None to move in discrete time. (always move at max_speed)
+
+        Keyword arguments:
+        position -- current position
+        angle -- current facing direction
+        speed -- current speed
+        turn_rate -- turning speed
+        max_speed -- maximum allowed forward speed
+        min_speed -- maximum allowed backwards speed
+        mass -- mass of the movable
+        force -- force exerted when accelerating
+
+        Position must be a tuple, list or numpy.ndarray.
+        Setting force=None requires max_speed to be specified.
+        Specifying max_speed and setting min_speed=None,
+        will set min_speed=max_speed.
         """
         assert speed is not None
         if max_speed is not None:
@@ -22,7 +45,7 @@ class Movable():
         self.position = position  # current position
         self.angle = angle  # current angle
         self.speed = speed  # current speed
-        self.turn_rate = turn_rate  # current turn rate
+        self.turn_rate = turn_rate  # turn rate
         self.max_speed = max_speed  # maximum forward speed
         self.min_speed = max_speed if min_speed is None else min_speed  # maximum backwards speed
         self.mass = mass  # mass of movable
@@ -47,9 +70,7 @@ class Movable():
 
     @property
     def velocity(self):
-        """
-        Velocity of the movable.
-        """
+        """Velocity of the movable."""
         return np.array([self.speed * np.cos(self.angle),
                          self.speed * np.sin(self.angle)])
 
@@ -57,7 +78,8 @@ class Movable():
         """
         To be implemented by subclasses.
 
-        Radial distance from center point to edge of movable at given angle.
+        Radial distance from center point to the edge 
+        of this movable at the given angle.
         """
         raise NotImplementedError
 
@@ -73,82 +95,110 @@ class Movable():
         """
         Translational movement for the movable.
 
-        Set dt is None to set position to given position.
         Set dt > 0.0 to make the movable move at its current speed.
+        Set dt is None to set position to given position.
         """
         assert dt >= 0 or dt is None, 'dt = ' + str(dt)
 
         if dt is None:
-            if not position:
+            if position is None:
                 raise ValueError("Position must be specified when dt is None.")
             self.position = position
         else:
             self.position += self.velocity * dt
 
-    def turn(self, dt=0.001, angle=0.0):
+    def turn(self, dt=0.001, angle=None):
         """
-        Set dt is None to set angle to given angle.
+        Rotational movement for the movable.
+
         Set dt > 0.0 to make the movable turn counterclockwise.
         Set dt < 0.0 to make the movable turn clockwise.
+        Set dt is None to set angle to given angle.
         """
 
         if dt is None:
+            if angle is None:
+                raise ValueError("Angle must be specified when dt is None.")
             self.angle = angle
         else:
             self.angle += (self.turn_rate * dt)
 
     def accelerate(self, dt=0.001):
         """
-        Accelerate for a short time to move forward.
-        If max_speed was set, speed will be set to max_speed.
+        Increase movement speed.
+
+        Discrete: set speed to max_speed.
+        Continuous: increase speed proportional to force.
+                    If max_speed was set, speed will max out at max_speed.
         """
         if self.force is None:
             self.speed = self.max_speed
         else:
             ds = self.force / self.mass * dt
             speed = self.speed + ds
-            if self.max_speed is not None \
-                    and speed > self.max_speed:
+            if self.max_speed is not None and speed > self.max_speed:
                 self.speed = self.max_speed
             else:
                 self.speed = speed
 
     def slow(self, dt=0.001):
         """
-        Slow down for a short time to return to a standstill.
+        Reduce absolute movement speed to come to a standstill.
+        
+        Discrete: set speed to zero.
+        Continuous: reduce speed proportional to force.
         """
         if self.force is None:
             self.speed = 0.0
         else:
             if not self.speed == 0.0:
                 ds = self.force / self.mass * dt
-                self.speed -= np.sign(self.speed) * ds
+                if ds < abs(self.speed):
+                    self.speed -= np.sign(self.speed) * ds
+                else:
+                    self.speed = 0.0
 
     def decelerate(self, dt=0.001):
         """
-        Decelerate for a short time to move backwards.
-        If min_speed was set, speed will be set to min_speed.
+        Reduce movement speed to go backwards.
+
+        Discrete: set speed to min_speed.
+        Continuous: increase speed proportional to force.
+                    If min_speed was set, speed will max out at min_speed.
         """
         if self.force is None:
             self.speed = self.min_speed
         else:
             ds = -self.force / self.mass * dt
             speed = self.speed + ds
-            if self.min_speed is not None \
-                    and speed < self.min_speed:
+            if self.min_speed is not None and speed < self.min_speed:
                 self.speed = self.min_speed
             else:
                 self.speed = speed
 
     def angle_to_point(self, point):
+        """
+        Calculate the angle at which the given point sits
+        relative to the position of this movable.
+        """
         return np.arctan2(point[1] - self.position[1],
                           point[0] - self.position[0]) % (2.0*np.pi)
 
     def distance_to_point(self, point):
+        """
+        Calculate the distance to a point from the position of this movable.
+        """
         # unfortunate fix for floating point errors
         return int(np.linalg.norm(point - self.position) * 1e6 + 0.5) / 1e6
 
     def point_on_obstacle_along_angle(self, obstacle, angle):
+        """
+        Calculate the intersection point of the radial line
+        from the position of this movable at the given angle
+        with the given obstacle.
+
+        (Only implemented for obstacles which are line segments.)
+        """
         for p in obstacle.points:
             if fuzzy_equal(self.angle_to_point(p), angle):
                 return p
@@ -166,6 +216,13 @@ class Movable():
         return line_segment_line_segment_intersection(pnt1, pnt2, pnt3, pnt4)
 
     def distance_to_obstacle_along_angle(self, obstacle, angle):
+        """
+        Calculate the distance along the radial line 
+        from the position of this movable at the given angle 
+        to the given obstacle.
+
+        (Only implemented for obstacles which are line segments.)
+        """
         point = self.point_on_obstacle_along_angle(obstacle, angle)
 
         if point is None:
@@ -174,6 +231,11 @@ class Movable():
         return self.distance_to_point(point)
 
     def points_of_obstacle_clockwise_of_point(self, obstacle, point):
+        """
+        Obtain the list of vertices of the given obstacle 
+        which lie in clockwise direction of the line 
+        from the position of this movable to the given point.
+        """
         clockwise_points = []
         for p in obstacle.points:
             if orientation(self.position, point, p) < 0:
@@ -182,6 +244,11 @@ class Movable():
         return clockwise_points
 
     def points_of_obstacle_clockwise_of_angle(self, obstacle, angle):
+        """
+        Obtain the list of vertices of the given obstacle 
+        which lie in clockwise direction of the radial line 
+        from the position of this movable at the given angle.
+        """
         point = self.point_on_obstacle_along_angle(obstacle, angle)
 
         if point is None:
@@ -190,6 +257,14 @@ class Movable():
         return self.points_of_obstacle_clockwise_of_point(obstacle, point)
 
     def closest_distance_to_obstacle_clockwise_of_angle(self, obstacle, angle):
+        """
+        Calculate the closest distance 
+        from the position of this movable to the given obstacle 
+        for the part of the obstacle which lies clockwise of the radial line 
+        from the position of this movable at the given angle.
+
+        (Only implemented for obstacles which are line segments.)
+        """
         closest_distance = np.inf
 
         point = self.point_on_obstacle_along_angle(obstacle, angle)
@@ -207,6 +282,10 @@ class Movable():
         return closest_distance
 
     def time_to_obstacle_collision(self, obstacle):
+        """
+        Calculate the time until this movable will collide 
+        with the given obstacle.
+        """
         if self.speed == 0.0:
             return np.inf
 
@@ -221,6 +300,12 @@ class Movable():
         return distance / speed
 
     def bounce_obstacle(self, obstacle):
+        """
+        Handle collision with the given obstacle.
+
+        Discrete: set speed to zero.
+        Continuous: elastic collision. (behavior is subject to change)
+        """
         if self.force is None:
             self.speed = 0.0
         else:
@@ -229,9 +314,16 @@ class Movable():
             self.angle = (2*theta - self.angle)
 
     def distance_to_entity(self, entity):
+        """
+        Calculate the distance to the given entity.
+        """
         return self.distance_to_point(entity.position)
 
     def time_to_entity_collision(self, entity):
+        """
+        Calculate the time until this movable will collide 
+        with the given entity.
+        """
         if self.speed == 0.0:
             return np.inf
 
@@ -254,6 +346,11 @@ class Movable():
     def bounce_entity(self, entity):
         """
         Currently unused.
+
+        Handle collision with the given entity.
+
+        Discrete: set speed of both movables to zero.
+        Continuous: elastic collision. (behavior is subject to change)
         """
         if self.force is None:
             self.speed = 0.0
@@ -280,16 +377,24 @@ class Movable():
     def obstacle_collision(self, obstacle):
         """
         To be implemented by subclasses.
+
+        Resolve collision with the given obstacle.
         """
         raise NotImplementedError
 
     def entity_collision(self, entity):
         """
         To be implemented by subclasses.
+
+        Resolve collision with the given entity.
         """
         raise NotImplementedError
 
     def sort_obstacle_endpoint_angles(self, obstacles):
+        """
+        Sort vertices of a list of obstacles according to the angle
+        relative to the position of this movable.
+        """
         points = [p for o in obstacles for p in o.points]
         point_angles = [self.angle_to_point(p) for p in points]
         filtered_angles = list(set(point_angles))
@@ -298,4 +403,5 @@ class Movable():
         return filtered_angles
 
     def consume(self):
+        """Consume this movable."""
         self.consumed = True

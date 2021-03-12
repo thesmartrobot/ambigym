@@ -18,10 +18,12 @@ class Wall(o.Immovable):
 
     @property
     def length(self):
+        """Length of the wall."""
         return np.linalg.norm(self.points[1] - self.points[0])
 
     @property
     def angle(self):
+        """Orientation of the wall."""
         return np.arctan2(self.points[1][1] - self.points[0][1],
                           self.points[1][0] - self.points[0][0]) % (2.0*np.pi)
 
