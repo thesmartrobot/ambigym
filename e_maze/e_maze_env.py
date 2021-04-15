@@ -28,7 +28,7 @@ WHITE = (255, 255, 255)
 
 class EMazeEnv(gym.Env):
     metadata = {
-        'render.modes': ['human', 'rgb_array', 'static'],
+        'render.modes': ['human', 'rgb_array'],
         'video.frames_per_second': FPS
     }
 
@@ -106,6 +106,7 @@ class EMazeEnv(gym.Env):
         return observation, reward, done, {}
 
     def _step(self, dt):
+        """Advance time by time dt."""
         time_to_collision = np.inf
         collider = None
         collidee = None
@@ -135,6 +136,7 @@ class EMazeEnv(gym.Env):
             self._step(dt-time_to_collision)
 
     def _action_resolve(self, action, dt):
+        """Perform action."""
         if action != 0:
             if action == 1:  # turn left
                 self.entities["mouse"].turn(-dt)
@@ -148,14 +150,13 @@ class EMazeEnv(gym.Env):
             self.entities["mouse"].slow(dt)
 
     def _advance(self, dt):
-        """
-        Advance all entities.
-        """
+        """Advance all entities."""
         if dt >= 0:
             for e in self.entities.values():
                 e.move(dt=dt)
 
     def _resolve(self, collider, collidee):
+        """Resolve all collisions."""
         if isinstance(collidee, Immovable):
             collider.obstacle_collision(collidee)
         elif isinstance(collidee, Movable):
@@ -165,6 +166,10 @@ class EMazeEnv(gym.Env):
                          if not val.consumed}
 
     def _close_paths(self):
+        """
+        Close paths when the mouse enters a branch.
+        Used when close_paths=True.
+        """
         mouse = self.entities["mouse"]
         if mouse.position[0] < 1.0:
             self.boundaries.append(Wall((1.0, 2.0), (1.0, 3.0)))
@@ -182,6 +187,7 @@ class EMazeEnv(gym.Env):
         return self.step(0)[0]
 
     def _initialize_terrain(self):
+        """Initialize the environment."""
         # walls and windows
         self.boundaries = [Wall((0.0, 0.0), (0.0, 3.0)),
                            Wall((0.0, 3.0), (3.0, 3.0)),
@@ -207,16 +213,21 @@ class EMazeEnv(gym.Env):
                          "mouse": Mouse((1.5, 1.5), angle=0, fov=self.player_fov)}
 
     def render(self, mode='human'):
+        """
+        Different rendering modes:
+        'human' will render the environment to the screen.
+        'rgb_array' will compute the RGB array only.
+        """
         if "t" not in self.__dict__:
             return  # reset() not called yet
 
-        if mode in ['human', 'static'] and self.viewer is None:
+        if mode == 'human' and self.viewer is None:
             cv2.namedWindow(WND_NAME,
                             cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_KEEPRATIO)
             cv2.resizeWindow(WND_NAME, WINDOW_SIZE, WINDOW_SIZE)
             self.viewer = True
 
-        if mode in ['human', 'static']:
+        if mode == 'human':
             unit_length = (min(VIDEO_W, VIDEO_H) - 1) / WORLD_SIZE
             image = np.ones((VIDEO_W, VIDEO_H, 3), np.uint8) * 255
         if mode == 'rgb_array':
@@ -242,20 +253,13 @@ class EMazeEnv(gym.Env):
         if mode == 'human' and self.viewer:
             cv2.imshow(WND_NAME, image)
             key = cv2.waitKey(1)
-            if key == ord('q'):
-                LOGGER.warning("Pressed 'q'.")
-                return False
-
-        if mode == 'static' and self.viewer:
-            cv2.imshow(WND_NAME, image)
-            while((cv2.waitKey() & 0xEFFFFF) != 32):
-                True
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         arr = np.asarray(image)
         return arr
 
     def _cast_shadow(self):
+        """Compute the location of shadows cast by boundaries."""
         mouse = self.entities["mouse"]
         nontransparent = [b for b in self.boundaries if not b.transparent]
         # find angles of endpoints of boundaries relative to mouse
@@ -341,6 +345,10 @@ class EMazeEnv(gym.Env):
         return visible_walls
 
     def _render_shadow(self, polygon, image, unit_length):
+        """
+        Render shadows cast by boundaries.
+        Used when shadows=True.
+        """
         polygon = np.vstack(polygon)
         mask = np.zeros_like(image, np.uint8) * 255
         color = WHITE
@@ -351,6 +359,10 @@ class EMazeEnv(gym.Env):
         return cv2.bitwise_and(image, mask)
 
     def _render_view_distance(self, image, unit_length):
+        """
+        Render shadows cast by limited view distance.
+        Used when player_view_distance!=None.
+        """
         mask = np.zeros_like(image, np.uint8) * 255
         mouse = self.entities["mouse"]
         center = tuple((mouse.position * unit_length).astype(int))
@@ -371,52 +383,77 @@ class EMazeEnv(gym.Env):
         return [seed]
 
 
-def test_environment(mode='human', record_video=False, **env_kwargs):
+def test_environment(record_video=False, mode='human', **env_kwargs):
+    """
+    Test the environment.
+
+    Use arrow keys to move.
+    Press s to save an image of the current view.
+    Press esc to exit.
+
+    The window closes when the cheese is consumed.
+
+    Keyword arguments:
+    record_video -- specify whether to record a video while testing.
+    mode -- used for recording, specify which view to record.
+    env_kwargs -- environment parameters.
+
+    When record_video=True, a video will be saved in 
+    the current working folder.
+    """
     from pynput import keyboard
     from pynput.keyboard import Key
 
     def on_press(key):
-        r = env.render()
+        if env.steps == 1:
+            env.render()
+            env.step(0)
+            env.render()
+            return True
+
         if key == keyboard.KeyCode.from_char("s"):
             rgb = env.render(mode='rgb_array')
             rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
             cv2.imwrite('env.png', rgb)
-            print('Image saved.')
-        else:
-            action = 0
-            if key == Key.left:
-                action = 1
-            if key == Key.right:
-                action = 2
-            if key == Key.up:
-                action = 3
-            if key == Key.down and 'allow_back' in env_kwargs and env_kwargs['allow_back']:
-                action = 4
+            LOGGER.warning('Image saved.')
+            return True
 
-            s, _, done, _ = env.step(action)
-            r = env.render()
-            if record_video and isinstance(r, np.ndarray):
-                if mode == 'human':
-                    frame = r
-                if mode == 'rgb_array':
-                    frame = s
-                img_array.append(frame)
-            if done:
-                env.close()
-            return not done and r != 0
+        action = 0
+        if key == Key.left:
+            action = 1
+        if key == Key.right:
+            action = 2
+        if key == Key.up:
+            action = 3
+        if key == Key.down and 'allow_back' in env_kwargs and env_kwargs['allow_back']:
+            action = 4
+
+        s, _, done, _ = env.step(action)
+        r = env.render()
+        if record_video and isinstance(r, np.ndarray):
+            if mode == 'human':
+                frame = r
+            if mode == 'rgb_array':
+                frame = s
+            img_array.append(frame)
+        if done:
+            env.close()
+            return False
+        return True
 
     def on_release(key):
         if key == Key.esc:
             # Stop listener
             env.close()
             return False
+        return True
 
     if record_video:
         img_array = []
 
     env = EMazeEnv(**env_kwargs)
     env.reset()
-    print('Press a key to start.')
+    LOGGER.warning('Press a key to start.')
     with keyboard.Listener(
             on_press=on_press,
             on_release=on_release) as listener:
@@ -428,7 +465,7 @@ def test_environment(mode='human', record_video=False, **env_kwargs):
 
         now = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-        print('Making video...')
+        LOGGER.warning('Making video...')
         height, width, layers = img_array[0].shape
         size = (width, height)
 
@@ -440,7 +477,7 @@ def test_environment(mode='human', record_video=False, **env_kwargs):
         for i in range(len(img_array)):
             out.write(img_array[i])
         out.release()
-        print('Done.')
+        LOGGER.warning('Done.')
 
 
 if __name__ == "__main__":
