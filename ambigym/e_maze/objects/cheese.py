@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 
-import e_maze.objects as o
+import ambigym.e_maze.objects as o
 
 YELLOW = (0, 255, 255)
 

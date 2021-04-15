@@ -4,7 +4,7 @@ with open("requirements.txt", "r") as req:
     requirements = req.read().splitlines()
 
 setup(
-    name='e_maze',
+    name='ambigym',
     author="DML group",
     version='0.1',
     description="Benchmark set of environments",

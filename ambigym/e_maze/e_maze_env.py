@@ -6,8 +6,21 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-from e_maze.objects import Movable, Immovable, Wall, Window, Cheese, Mouse
-from e_maze.utils import orientation, line_segment_circle_intersection, line_segment_line_segment_intersection, distance_point_to_line_segment, fuzzy_equal
+from ambigym.e_maze.objects import (
+    Movable,
+    Immovable,
+    Wall,
+    Window,
+    Cheese,
+    Mouse,
+)
+from ambigym.e_maze.utils import (
+    orientation,
+    line_segment_circle_intersection,
+    line_segment_line_segment_intersection,
+    distance_point_to_line_segment,
+    fuzzy_equal,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -17,7 +30,7 @@ WORLD_SIZE = 3.0  # in meters
 
 WINDOW_SIZE = 960
 
-STATE_W = 96   # less than Atari 160x192
+STATE_W = 96  # less than Atari 160x192
 STATE_H = 96
 VIDEO_W = WINDOW_SIZE
 VIDEO_H = WINDOW_SIZE
@@ -26,24 +39,32 @@ FPS = 8
 
 WHITE = (255, 255, 255)
 
+
 class EMazeEnv(gym.Env):
     metadata = {
-        'render.modes': ['human', 'rgb_array'],
-        'video.frames_per_second': FPS
+        "render.modes": ["human", "rgb_array"],
+        "video.frames_per_second": FPS,
     }
 
-    def __init__(self, allow_back=False, shadows=True, max_length=None,
-                 player_fov=1.1*np.pi, player_view_distance=None,
-                 cheese_pos='random', close_paths=False, reward_type='static'):
+    def __init__(
+        self,
+        allow_back=False,
+        shadows=True,
+        max_length=None,
+        player_fov=1.1 * np.pi,
+        player_view_distance=None,
+        cheese_pos="random",
+        close_paths=False,
+        reward_type="static",
+    ):
         self.seed()
         self.boundaries = []
         self.entities = {}
 
-        self.action_space = spaces.Discrete(n=(4+allow_back))
+        self.action_space = spaces.Discrete(n=(4 + allow_back))
         self.observation_space = spaces.Box(
-            low=0, high=255,
-            shape=(STATE_H, STATE_W, 3),
-            dtype=np.uint8)
+            low=0, high=255, shape=(STATE_H, STATE_W, 3), dtype=np.uint8
+        )
 
         self.viewer = None
 
@@ -56,24 +77,24 @@ class EMazeEnv(gym.Env):
         self.max_length = max_length
 
         assert player_fov > 0
-        if player_fov <= 2*np.pi:
+        if player_fov <= 2 * np.pi:
             self.player_fov = player_fov
         else:
-            self.player_fov = player_fov/180*np.pi
+            self.player_fov = player_fov / 180 * np.pi
 
         self.player_view_distance = player_view_distance
 
-        assert cheese_pos in ['random', 'left', 'right']
+        assert cheese_pos in ["random", "left", "right"]
         self.cheese_pos = cheese_pos
 
         self.close_paths = close_paths
         self.paths_closed = False
 
-        assert reward_type in ['static', 'decreasing']
+        assert reward_type in ["static", "decreasing"]
         self.reward_type = reward_type
 
     def step(self, action):
-        dt = 1/FPS
+        dt = 1 / FPS
         curr_time = self.t + dt
         self._action_resolve(action, dt)
 
@@ -88,14 +109,19 @@ class EMazeEnv(gym.Env):
         self.steps += 1
 
         # return variables
-        observation = self.render(mode='rgb_array')
+        observation = self.render(mode="rgb_array")
 
-        found = not bool({key: val for key, val in self.entities.items()
-                         if isinstance(val, Cheese)})
+        found = not bool(
+            {
+                key: val
+                for key, val in self.entities.items()
+                if isinstance(val, Cheese)
+            }
+        )
 
-        if self.reward_type == 'static':
+        if self.reward_type == "static":
             reward = int(found)
-        elif self.reward_type == 'decreasing':
+        elif self.reward_type == "decreasing":
             reward = -1 if not found else 0
 
         if self.max_length is not None:
@@ -133,7 +159,7 @@ class EMazeEnv(gym.Env):
         else:
             self._advance(time_to_collision)
             self._resolve(collider, collidee)
-            self._step(dt-time_to_collision)
+            self._step(dt - time_to_collision)
 
     def _action_resolve(self, action, dt):
         """Perform action."""
@@ -162,8 +188,9 @@ class EMazeEnv(gym.Env):
         elif isinstance(collidee, Movable):
             collider.entity_collision(collidee)
 
-        self.entities = {key: val for key, val in self.entities.items()
-                         if not val.consumed}
+        self.entities = {
+            key: val for key, val in self.entities.items() if not val.consumed
+        }
 
     def _close_paths(self):
         """
@@ -189,14 +216,16 @@ class EMazeEnv(gym.Env):
     def _initialize_terrain(self):
         """Initialize the environment."""
         # walls and windows
-        self.boundaries = [Wall((0.0, 0.0), (0.0, 3.0)),
-                           Wall((0.0, 3.0), (3.0, 3.0)),
-                           Wall((3.0, 3.0), (3.0, 0.0)),
-                           Wall((3.0, 0.0), (0.0, 0.0)),
-                           Wall((1.0, 0.8), (1.0, 2.0)),
-                           Wall((2.0, 0.8), (2.0, 2.0)),
-                           Window((1.0, 0.0), (1.0, 0.8)),
-                           Window((2.0, 0.0), (2.0, 0.8))]
+        self.boundaries = [
+            Wall((0.0, 0.0), (0.0, 3.0)),
+            Wall((0.0, 3.0), (3.0, 3.0)),
+            Wall((3.0, 3.0), (3.0, 0.0)),
+            Wall((3.0, 0.0), (0.0, 0.0)),
+            Wall((1.0, 0.8), (1.0, 2.0)),
+            Wall((2.0, 0.8), (2.0, 2.0)),
+            Window((1.0, 0.0), (1.0, 0.8)),
+            Window((2.0, 0.0), (2.0, 0.8)),
+        ]
 
         if self.close_paths:
             self.boundaries.append(Wall((0.5, 2.0), (1.0, 2.0)))
@@ -204,15 +233,17 @@ class EMazeEnv(gym.Env):
 
         # objects
         cheese_x = 0.5
-        if self.cheese_pos == 'random':
-            cheese_x += 2.0*np.random.randint(2)
-        elif self.cheese_pos == 'right':
+        if self.cheese_pos == "random":
+            cheese_x += 2.0 * np.random.randint(2)
+        elif self.cheese_pos == "right":
             cheese_x += 2.0
 
-        self.entities = {"cheese": Cheese((cheese_x, 0.5)),
-                         "mouse": Mouse((1.5, 1.5), angle=0, fov=self.player_fov)}
+        self.entities = {
+            "cheese": Cheese((cheese_x, 0.5)),
+            "mouse": Mouse((1.5, 1.5), angle=0, fov=self.player_fov),
+        }
 
-    def render(self, mode='human'):
+    def render(self, mode="human"):
         """
         Different rendering modes:
         'human' will render the environment to the screen.
@@ -221,16 +252,17 @@ class EMazeEnv(gym.Env):
         if "t" not in self.__dict__:
             return  # reset() not called yet
 
-        if mode == 'human' and self.viewer is None:
-            cv2.namedWindow(WND_NAME,
-                            cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_KEEPRATIO)
+        if mode == "human" and self.viewer is None:
+            cv2.namedWindow(
+                WND_NAME, cv2.WINDOW_GUI_NORMAL | cv2.WINDOW_KEEPRATIO
+            )
             cv2.resizeWindow(WND_NAME, WINDOW_SIZE, WINDOW_SIZE)
             self.viewer = True
 
-        if mode == 'human':
+        if mode == "human":
             unit_length = (min(VIDEO_W, VIDEO_H) - 1) / WORLD_SIZE
             image = np.ones((VIDEO_W, VIDEO_H, 3), np.uint8) * 255
-        if mode == 'rgb_array':
+        if mode == "rgb_array":
             unit_length = (min(STATE_W, STATE_H) - 1) / WORLD_SIZE
             image = np.ones((STATE_W, STATE_H, 3), np.uint8) * 255
 
@@ -250,7 +282,7 @@ class EMazeEnv(gym.Env):
 
         self.entities["mouse"].render(image, unit_length)
 
-        if mode == 'human' and self.viewer:
+        if mode == "human" and self.viewer:
             cv2.imshow(WND_NAME, image)
             key = cv2.waitKey(1)
 
@@ -266,20 +298,25 @@ class EMazeEnv(gym.Env):
         endpoint_angles = mouse.sort_obstacle_endpoint_angles(nontransparent)
 
         # initialize obstacles and closest_obstacle at first angle
-        obstacles = [b for b in nontransparent
-                     if mouse.distance_to_obstacle_along_angle(
-                            b, endpoint_angles[0]
-                        ) < np.inf]
+        obstacles = [
+            b
+            for b in nontransparent
+            if mouse.distance_to_obstacle_along_angle(b, endpoint_angles[0])
+            < np.inf
+        ]
         obstacles.sort(
             key=lambda o: (
                 mouse.distance_to_obstacle_along_angle(o, endpoint_angles[0]),
-                mouse.closest_distance_to_obstacle_clockwise_of_angle(o, endpoint_angles[0])  # fix for obstacles starting at same point
-                )
+                mouse.closest_distance_to_obstacle_clockwise_of_angle(
+                    o, endpoint_angles[0]
+                ),  # fix for obstacles starting at same point
             )
+        )
         closest_obstacle = obstacles[0]
         # start first wall
         old_point = mouse.point_on_obstacle_along_angle(
-            closest_obstacle, endpoint_angles[0])
+            closest_obstacle, endpoint_angles[0]
+        )
 
         # list to hold lit walls
         visible_walls = [mouse.position]
@@ -289,15 +326,22 @@ class EMazeEnv(gym.Env):
 
             # add any walls that begin at this angle to list
             for boundary in nontransparent:
-                these_points = [p for p in boundary.points
-                                if fuzzy_equal(mouse.angle_to_point(p), angle)]
+                these_points = [
+                    p
+                    for p in boundary.points
+                    if fuzzy_equal(mouse.angle_to_point(p), angle)
+                ]
                 if these_points:
-                    other_points = [p for p in boundary.points
-                                    if not fuzzy_equal(mouse.angle_to_point(p),
-                                                       angle)]
-                    counterclockwise = [orientation(mouse.position, p, o) < 0
-                                        for p in these_points
-                                        for o in other_points]
+                    other_points = [
+                        p
+                        for p in boundary.points
+                        if not fuzzy_equal(mouse.angle_to_point(p), angle)
+                    ]
+                    counterclockwise = [
+                        orientation(mouse.position, p, o) < 0
+                        for p in these_points
+                        for o in other_points
+                    ]
                     if all(counterclockwise):
                         obstacles.append(boundary)
             obstacles = list(set(obstacles))
@@ -305,15 +349,22 @@ class EMazeEnv(gym.Env):
             # remove any walls that end at this angle from list
             to_remove = []
             for boundary in obstacles:
-                these_points = [p for p in boundary.points
-                                if fuzzy_equal(mouse.angle_to_point(p), angle)]
+                these_points = [
+                    p
+                    for p in boundary.points
+                    if fuzzy_equal(mouse.angle_to_point(p), angle)
+                ]
                 if these_points:
-                    other_points = [p for p in boundary.points
-                                    if not fuzzy_equal(mouse.angle_to_point(p),
-                                                       angle)]
-                    clockwise = [orientation(mouse.position, p, o) > 0
-                                 for p in these_points
-                                 for o in other_points]
+                    other_points = [
+                        p
+                        for p in boundary.points
+                        if not fuzzy_equal(mouse.angle_to_point(p), angle)
+                    ]
+                    clockwise = [
+                        orientation(mouse.position, p, o) > 0
+                        for p in these_points
+                        for o in other_points
+                    ]
                     if all(clockwise):
                         to_remove.append(boundary)
             obstacles = [o for o in obstacles if o not in to_remove]
@@ -322,9 +373,11 @@ class EMazeEnv(gym.Env):
             obstacles.sort(
                 key=lambda o: (
                     mouse.distance_to_obstacle_along_angle(o, angle),
-                    mouse.closest_distance_to_obstacle_clockwise_of_angle(o, angle)  # fix for obstacles starting at same point
-                    )
+                    mouse.closest_distance_to_obstacle_clockwise_of_angle(
+                        o, angle
+                    ),  # fix for obstacles starting at same point
                 )
+            )
 
             # if nearest wall changed or this is the last iteration
             nearest_wall_changed = obstacles[0] is not closest_obstacle
@@ -332,7 +385,8 @@ class EMazeEnv(gym.Env):
             if nearest_wall_changed or is_last_iter:
                 # complete current wall
                 new_point = mouse.point_on_obstacle_along_angle(
-                    closest_obstacle, angle)
+                    closest_obstacle, angle
+                )
 
                 visible_walls.append(old_point)
                 visible_walls.append(new_point)
@@ -340,7 +394,8 @@ class EMazeEnv(gym.Env):
                 # and begin a new one
                 closest_obstacle = obstacles[0]
                 old_point = mouse.point_on_obstacle_along_angle(
-                    closest_obstacle, angle)
+                    closest_obstacle, angle
+                )
 
         return visible_walls
 
@@ -375,7 +430,7 @@ class EMazeEnv(gym.Env):
         if self.viewer is not None:
             cv2.waitKey(1)
             cv2.destroyAllWindows()
-            LOGGER.warning('Program window closed.')
+            LOGGER.warning("Program window closed.")
             self.viewer = None
 
     def seed(self, seed=None):
@@ -383,7 +438,7 @@ class EMazeEnv(gym.Env):
         return [seed]
 
 
-def test_environment(record_video=False, mode='human', **env_kwargs):
+def test_environment(record_video=False, mode="human", **env_kwargs):
     """
     Test the environment.
 
@@ -398,7 +453,7 @@ def test_environment(record_video=False, mode='human', **env_kwargs):
     mode -- used for recording, specify which view to record.
     env_kwargs -- environment parameters.
 
-    When record_video=True, a video will be saved in 
+    When record_video=True, a video will be saved in
     the current working folder.
     """
     from pynput import keyboard
@@ -412,10 +467,10 @@ def test_environment(record_video=False, mode='human', **env_kwargs):
             return True
 
         if key == keyboard.KeyCode.from_char("s"):
-            rgb = env.render(mode='rgb_array')
+            rgb = env.render(mode="rgb_array")
             rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
-            cv2.imwrite('env.png', rgb)
-            LOGGER.warning('Image saved.')
+            cv2.imwrite("env.png", rgb)
+            LOGGER.warning("Image saved.")
             return True
 
         action = 0
@@ -425,15 +480,19 @@ def test_environment(record_video=False, mode='human', **env_kwargs):
             action = 2
         if key == Key.up:
             action = 3
-        if key == Key.down and 'allow_back' in env_kwargs and env_kwargs['allow_back']:
+        if (
+            key == Key.down
+            and "allow_back" in env_kwargs
+            and env_kwargs["allow_back"]
+        ):
             action = 4
 
         s, _, done, _ = env.step(action)
         r = env.render()
         if record_video and isinstance(r, np.ndarray):
-            if mode == 'human':
+            if mode == "human":
                 frame = r
-            if mode == 'rgb_array':
+            if mode == "rgb_array":
                 frame = s
             img_array.append(frame)
         if done:
@@ -453,10 +512,10 @@ def test_environment(record_video=False, mode='human', **env_kwargs):
 
     env = EMazeEnv(**env_kwargs)
     env.reset()
-    LOGGER.warning('Press a key to start.')
+    LOGGER.warning("Press a key to start.")
     with keyboard.Listener(
-            on_press=on_press,
-            on_release=on_release) as listener:
+        on_press=on_press, on_release=on_release
+    ) as listener:
         listener.join()
     env.close()
 
@@ -465,19 +524,20 @@ def test_environment(record_video=False, mode='human', **env_kwargs):
 
         now = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-        LOGGER.warning('Making video...')
+        LOGGER.warning("Making video...")
         height, width, layers = img_array[0].shape
         size = (width, height)
 
         out = cv2.VideoWriter(
-            f'cont_mouse_demo_{mode}_{now}.avi',
-            cv2.VideoWriter_fourcc(*'FMP4'),
+            f"cont_mouse_demo_{mode}_{now}.avi",
+            cv2.VideoWriter_fourcc(*"FMP4"),
             FPS,
-            size)
+            size,
+        )
         for i in range(len(img_array)):
             out.write(img_array[i])
         out.release()
-        LOGGER.warning('Done.')
+        LOGGER.warning("Done.")
 
 
 if __name__ == "__main__":

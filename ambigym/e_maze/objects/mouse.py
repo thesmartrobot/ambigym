@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 
-import e_maze.objects as o
-from e_maze.utils import line_segment_line_segment_intersection
+import ambigym.e_maze.objects as o
+from ambigym.e_maze.utils import line_segment_line_segment_intersection
 
 GREY = (192, 192, 192)
 

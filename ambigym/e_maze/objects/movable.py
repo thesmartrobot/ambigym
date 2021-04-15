@@ -1,6 +1,6 @@
 import numpy as np
 
-from e_maze.utils import fuzzy_equal, line_segment_line_segment_intersection, orientation, distance_point_to_line_segment
+from ambigym.e_maze.utils import fuzzy_equal, line_segment_line_segment_intersection, orientation, distance_point_to_line_segment
 
 class Movable():
     """
