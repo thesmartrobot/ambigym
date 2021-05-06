@@ -1,12 +1,12 @@
 import numpy as np
 import cv2
 
-import ambigym.e_maze.objects as o
+from . import Immovable
 
 RED = (0, 0, 255)
 
 
-class Wall(o.Immovable):
+class Wall(Immovable):
     """Wall object for use in the shadow world environment."""
 
     def __init__(self, point1, point2):
