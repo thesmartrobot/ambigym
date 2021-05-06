@@ -1,13 +1,14 @@
 import numpy as np
 import cv2
 
-import ambigym.e_maze.objects as o
+from . import Movable
+
 from ambigym.e_maze.utils import line_segment_line_segment_intersection
 
 GREY = (192, 192, 192)
 
 
-class Mouse(o.Movable):
+class Mouse(Movable):
     """Mouse object for use in the shadow world environment."""
 
     def __init__(

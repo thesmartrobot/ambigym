@@ -1,12 +1,12 @@
 import numpy as np
 import cv2
 
-import ambigym.e_maze.objects as o
+from . import Movable
 
 YELLOW = (0, 255, 255)
 
 
-class Cheese(o.Movable):
+class Cheese(Movable):
     """Cheese object for use in the shadow world environment."""
 
     def __init__(self, position):
