@@ -54,7 +54,7 @@ class EMazeEnv(gym.Env):
         player_fov=1.1 * np.pi,
         player_view_distance=None,
         cheese_pos="random",
-        close_paths=False,
+        close_paths=True,
         reward_type="static",
     ):
         self.seed()
@@ -541,4 +541,4 @@ def test_environment(record_video=False, mode="human", **env_kwargs):
 
 
 if __name__ == "__main__":
-    test_environment(close_paths=True)
+    test_environment()
