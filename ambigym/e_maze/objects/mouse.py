@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 
 from . import Movable
+from . import Cheese
 
 from ambigym.e_maze.utils import line_segment_line_segment_intersection
 
@@ -92,7 +93,7 @@ class Mouse(Movable):
 
     def entity_collision(self, entity):
         """Resolve collision with an entity (movable)."""
-        if isinstance(entity, o.Cheese):
+        if isinstance(entity, Cheese):
             entity.consume()
 
     def sort_obstacle_endpoint_angles(self, obstacles):
