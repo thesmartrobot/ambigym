@@ -17,4 +17,5 @@ Please cite our paper when using the E-maze environment.
   author={Samuel T. Wauthier and Pietro Mazzaglia and Ozan Çatal and Cedric De Boom and Tim Verbelen and Bart Dhoedt},
   booktitle={BRAIN2AI workshop at the International Conference on Learning Representations},
   year={2021}
-}```
+}
+```
