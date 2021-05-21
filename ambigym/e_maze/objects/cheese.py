@@ -26,5 +26,4 @@ class Cheese(Movable):
         self.bounce_obstacle(obstacle)
 
     def entity_collision(self, entity):
-        if isinstance(entity, o.Mouse):
-            self.consume()
+        pass
