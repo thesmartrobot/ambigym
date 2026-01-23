@@ -128,8 +128,14 @@ class EMazeEnv(gym.Env):
             done = found or self.steps > self.max_length
         else:
             done = found
+            
+        info = {
+            "mouse_pos": self.entities["mouse"].position,
+            "mouse_angle": self.entities["mouse"].angle,
+            "cheese_pos": self.entities["cheese"].position,
+        }
 
-        return observation, reward, done, {}
+        return observation, reward, done, info
 
     def _step(self, dt):
         """Advance time by time dt."""
